@@ -20,8 +20,7 @@ const int NUM_FLUIDS = 1;
 // loops need to go k j ifor cache optimization. our 1d array is in the order all i data then all j data then all k data 
 // this lets the cpu read the memory linearly instad of having to jump ahead.
 //(when its i j k then k changes every loop. its data is also the most spread out so it breaks the caching)
-// is this correct?
-// TODO: try changing the loops back now
+// TODO: try changing the loops back now?
 #define IX(i,j,k) ((i)+(j) * (N +2)+(k) * (N + 2) * (N + 2))
 
 // macro that swaps the pointers for two arrays 
@@ -126,7 +125,7 @@ public:
         int slice_stride = (N + 2) * (N + 2);
         // TODO could add dynamic stopping based on the error tolerance between x and x0 
         // 
-        for ( g=0; g<20; g++){
+        for ( g=0; g<12; g++){
             for ( k=1; k<=N; k++ ){
                 for ( j=1; j<=N; j++ ){
                     for ( i=1; i<=N; i++){
@@ -258,8 +257,8 @@ public:
         float scale_6 = 1.0f / 6.0f;
         int row_stride = N + 2;
         int slice_stride = (N + 2) * (N + 2);
-        // TODO: play with relaxation loop amounts 
-        for ( g=0 ; g<20 ; g++ ) {
+        // TODO: play with relaxation loop amounts sor 20 is stable
+        for ( g=0 ; g<12 ; g++ ) {
             for ( i=1 ; i<=N ; i++ ) {
                 for ( j=1 ; j<=N ; j++ ) {
                     for ( k=1; k<=N; k++){
@@ -377,9 +376,9 @@ public:
         }
 
         // higher is thicker
-        float safe_viscosity = 0.0000001f; 
+        float safe_viscosity = 0.00001f; 
         // higher is gas
-        float safe_diffusion = 0.0f;
+        float safe_diffusion = 0.0000001f;
 
         // vel_step processes your newly added gravity force along with fluid dynamics
         vel_step(N, u, v, w, u_old, v_old, w_old, safe_viscosity, dt);
