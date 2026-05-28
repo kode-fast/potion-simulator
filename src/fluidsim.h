@@ -5,6 +5,8 @@
 #include <cstring>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+/*based on stable fluids and real-time fluid dynamics for games by Jos Stam*/
+
 
 // N is the inner sim size of one edge
 const int N = 32;
@@ -15,6 +17,8 @@ const int GRID_SIZE = (N+2) * (N+2) * (N+2);
 
 // number of fluids that can be in the simulation 
 const int NUM_FLUIDS = 1;
+
+float gravity_constant = 5.0f;
 
 // macro that converts coordents to the index in the 1d array 
 // loops need to go k j ifor cache optimization. our 1d array is in the order all i data then all j data then all k data 
@@ -357,28 +361,55 @@ public:
         x[IX(N+1, N+1, N+1)] = 1.0f/3.0f * (x[IX(N, N+1, N+1)]+x[IX(N+1, N, N+1)]+x[IX(N+1, N+1, N)]);
     } 
     
-    void step(float dt) {
+    void step(float dt, glm::vec3 mouse_interaction, bool is_interacting) {
         // disapearing problem is that the fluid sim is for gas, and in the avging cells were going to 0 and 'evaperating'
         // the bounding cells were eating the liquid as there values are always 0 and they were avreging with the fluid making it go to 0
         // TODO: disapearing problem still exists 
             // mabey the relxation loops were just too small?
             // try to enforce the density? 
 
-        float gravity_constant = 5.0f;
+        // add mouse added velocities too : 
+        // nozzle effect interaction:
+        if (is_interacting) {
+            
+            // add velocity to just 1 index to give directional nozzel effect 
+            int targetI = N / 2;
+            int targetJ = 5; 
+            int targetK = N / 2;
+            int idx = IX(targetI, targetJ, targetK); // get idx of the selected vector 
+
+            u[idx] += mouse_interaction.x * 1.0f;
+            v[idx] += mouse_interaction.y * 1.0f;
+            w[idx] += mouse_interaction.z * 1.0f;
+
+            // add fluid:
+            densities[0][idx] += 1.0f;
+        }
 
         // add grav to every cell
         for (int cell_idx = 0; cell_idx < GRID_SIZE; cell_idx++) {
+
+            // use IX to calculate coordentes to index 
             float cell_density = densities[0][cell_idx];
             
+
+
             if (cell_density > 0.01f) {
                 v_old[cell_idx] -= cell_density * gravity_constant;
             }
+
+
         }
 
         // higher is thicker
         float safe_viscosity = 0.00001f; 
         // higher is gas
         float safe_diffusion = 0.0000001f;
+
+
+
+
+
 
         // vel_step processes your newly added gravity force along with fluid dynamics
         vel_step(N, u, v, w, u_old, v_old, w_old, safe_viscosity, dt);

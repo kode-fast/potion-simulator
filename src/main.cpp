@@ -10,10 +10,37 @@
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
+void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 
 // settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+
+const unsigned int SCR_WIDTH = 1920;
+const unsigned int SCR_HEIGHT = 1080;
+/*Based on leanopengl.com tutorial series*/
+
+// mouse interaction 
+glm::vec3 mouseInteractionForce(0.0f);
+bool isInteract = false;
+
+
+// mouse camera variables 
+bool cameraOn = false;
+bool firstMouse = true;
+
+glm::vec3 cameraPos   = glm::vec3(0.0f, 0.0f,  10.0f);
+glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
+glm::vec3 cameraRight = glm::cross(cameraFront, cameraUp);
+
+float last_mouse_x;
+float last_mouse_y;
+
+float yaw;
+float pitch;
+
+float lastX;
+float lastY;
 
 
 int main()
@@ -152,26 +179,30 @@ int main()
    // ------------------
 
     float fov = 45.0f; // fov angle 
-    float aspectRatio = 800.0f / 600.0f; 
+    float aspectRatio = (float)SCR_WIDTH / (float)SCR_HEIGHT; 
     float nearPlane = 0.1f; // dont draw things closer than this
     float farPlane = 100.0f; // dont draw things farther than this
 
-    
     glm::mat4 projectionMatrix = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane);
+
+
 
     float delta_time = 0;
     float last_frame_time = 0;
     float current_frame_time = 0;
     int nbFrames = 0;
 
-    const float radius = 10.0f;
-    float camX = sin(glfwGetTime()) * radius;
-    float camZ = cos(glfwGetTime()) * radius;
-    glm::mat4 view = glm::lookAt(glm::vec3(camX, 0.0, camZ), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
 
-    glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); 
-    model = glm::scale(model, glm::vec3(4.0f, 4.0f, 4.0f));
+
+
+    const float radius = 10.0f;
+
+
+    // capture curser and set callback functoin 
+    
+    glfwSetCursorPosCallback(window, mouse_callback);
+    // register mouse button callback too for mouse controlls
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -185,17 +216,14 @@ int main()
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // generate moving camera
-        /*
-        const float radius = 10.0f;
-        float camX = sin(glfwGetTime()) * radius;
-        float camZ = cos(glfwGetTime()) * radius;
-        glm::mat4 view = glm::lookAt(glm::vec3(camX, 0.0, camZ), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
+        // camera calculations:
+        glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); 
         model = glm::scale(model, glm::vec3(4.0f, 4.0f, 4.0f));
-*/
+        
+
         // render wire frame
         triangle_shader.use();
 
@@ -214,7 +242,12 @@ int main()
         delta_time = current_frame_time - last_frame_time;
         last_frame_time = current_frame_time;
 
-        sim.step(delta_time);
+       // calculate mouse movement 
+
+
+
+
+        sim.step(delta_time, mouseInteractionForce, isInteract);
 
         // ----------------------
         // debug print frame time 
@@ -223,9 +256,6 @@ int main()
             printf("%f ms/frame\n", delta_time);
         }
            // printf("%f ms/frame\n", delta_time);
-
-
-
 
 
         // need to active shader before anything gets sent to it
@@ -238,8 +268,9 @@ int main()
         glUniformMatrix4fv(glGetUniformLocation(fluid_shader.ID, "view"), 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(glGetUniformLocation(fluid_shader.ID, "projection"), 1, GL_FALSE, glm::value_ptr(projectionMatrix));
         
+
         // send the local camera position too 
-        glm::vec3 worldCameraPos = glm::vec3(camX, 0.0, camZ); 
+        glm::vec3 worldCameraPos = cameraPos; 
         glm::mat4 inverseModel = glm::inverse(model);
         glm::vec4 localCam4 = inverseModel * glm::vec4(worldCameraPos, 1.0f);
         glm::vec3 cameraPosLocal = glm::vec3(localCam4) + glm::vec3(0.5f);
@@ -309,15 +340,119 @@ int main()
     return 0;
 }
 
+// mouse callback function 
+void mouse_callback(GLFWwindow* window, double xpos, double ypos)
+{
+    // interact logic: 
+    if (isInteract) {
+            if (firstMouse) {
+                lastX = xpos;
+                lastY = ypos;
+                firstMouse = false;
+            }
+
+            float xoffset = xpos - lastX;
+            float yoffset = lastY - ypos; 
+
+            lastX = xpos;
+            lastY = ypos;
+
+            mouseInteractionForce = (cameraUp * yoffset) + (cameraRight * xoffset);
+
+            // if we are interacting we dont want to be able to move the camera 
+            return;
+    }
+
+
+    // camera logic:
+    if (cameraOn)
+    {
+
+        if (firstMouse)
+        {
+            lastX = xpos;
+            lastY = ypos;
+            firstMouse = false;
+        }
+    
+        float xoffset = xpos - lastX;
+        float yoffset = lastY - ypos; 
+        lastX = xpos;
+        lastY = ypos;
+
+        float sensitivity = 0.05f;
+        xoffset *= sensitivity;
+        yoffset *= sensitivity;
+
+        yaw   += xoffset;
+        pitch += yoffset;
+
+        if(pitch > 89.0f)
+            pitch = 89.0f;
+        if(pitch < -89.0f)
+            pitch = -89.0f;
+
+        // orbatile camera 
+        glm::vec3 direction;
+        direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+        direction.y = sin(glm::radians(pitch));
+        direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+        glm::vec3 vector_to_camera = glm::normalize(direction); // this is the vector pointing at the camera 
+
+        // 
+        glm::vec3 target = glm::vec3(0.0,0.0,0.0);
+        float radius = 10.0;
+
+        cameraPos = target + (vector_to_camera * radius);
+        cameraFront = glm::normalize(target-cameraPos);
+        // use temp up vector for the cross product to get vector to the right of the camera front vector
+        cameraRight = glm::normalize(glm::cross(cameraFront, glm::vec3(0.0f, 1.0f, 0.0f)));
+        // get the camera up vector 
+        cameraUp = glm::normalize(glm::cross(cameraRight, cameraFront));
+
+    }
+
+
+}
+
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+{
+    if (button == GLFW_MOUSE_BUTTON_RIGHT)
+    {
+        if (action == GLFW_PRESS){
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            cameraOn = true;
+        }
+
+        else if (action == GLFW_RELEASE){
+            cameraOn = false;
+            firstMouse = true; 
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        }
+
+    }
+
+    if (button == GLFW_MOUSE_BUTTON_LEFT)
+    {
+        if (action == GLFW_PRESS) {
+            isInteract = true;
+        } else if (action == GLFW_RELEASE) {
+            mouseInteractionForce = glm::vec3(0.0f);
+            isInteract = false;
+            firstMouse = true; 
+        }
+    }
+}
+
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
-    
+    if (glfwGetKey(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 }
-
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
 // ---------------------------------------------------------------------------------------------
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)

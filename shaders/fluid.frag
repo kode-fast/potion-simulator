@@ -12,7 +12,7 @@ uniform int grid_depth = 32 + 2; // N+2
 uniform int num_fluids = 1;
 
 uniform vec3 camera_pos_local;
-uniform int max_steps = 128;
+uniform int max_steps = 256; // 128
 uniform float step_size = 0.01;
 
 uniform vec3 fluid_colors[1];

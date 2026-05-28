@@ -4,3 +4,4 @@ include/*
 lib/*
 glfw3.dll
 src/glad.c
+todo.md
