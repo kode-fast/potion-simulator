@@ -18,7 +18,7 @@ const int GRID_SIZE = (N+2) * (N+2) * (N+2);
 // number of fluids that can be in the simulation 
 const int NUM_FLUIDS = 1;
 
-float gravity_constant = 5.0f;
+float gravity_constant = 800.0f; // without dt *,  10 ~ 20is good
 
 // macro that converts coordents to the index in the 1d array 
 // loops need to go k j ifor cache optimization. our 1d array is in the order all i data then all j data then all k data 
@@ -395,21 +395,22 @@ public:
 
 
             if (cell_density > 0.01f) {
-                v_old[cell_idx] -= cell_density * gravity_constant;
+                v_old[cell_idx] -= cell_density * gravity_constant * dt;
             }
 
 
         }
 
         // higher is thicker
-        float safe_viscosity = 0.00001f; 
+        //float safe_viscosity = 0.00001f; 
         // higher is gas
-        float safe_diffusion = 0.0000001f;
+        //float safe_diffusion = 0.0000001f;
 
-
-
-
-
+        // higher is thicker
+        float safe_viscosity = 0.000000001f; 
+        // higher is gas
+        // TODO: any diffusion number seams to make the fluid disapear eventualy
+        float safe_diffusion = 0.00001f;
 
         // vel_step processes your newly added gravity force along with fluid dynamics
         vel_step(N, u, v, w, u_old, v_old, w_old, safe_viscosity, dt);

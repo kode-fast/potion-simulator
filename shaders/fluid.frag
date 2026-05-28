@@ -61,7 +61,7 @@ void main(){
                 //FragColor = vec4(1.0, 0.0, 1.0, 1.0); 
                 //return;
                 // ----------
-                float sample_absorb = density * step_size * 500.0;
+                float sample_absorb = density * step_size * 500.0; // * 500 looks good
                 // add fluid color scaled by its density 
                 mixed_color += fluid_colors[i] * sample_absorb * (1.0 - accumulated_density);
                 accumulated_density += sample_absorb;

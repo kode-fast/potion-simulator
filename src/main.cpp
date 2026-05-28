@@ -3,21 +3,19 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <filesystem> // temp for checking file path
 
 #include "fluidsim.h"
 #include "shader.h"
 
+/*Based on learnopengl.com tutorial series*/
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 
 // settings
-
 const unsigned int SCR_WIDTH = 1920;
 const unsigned int SCR_HEIGHT = 1080;
-/*Based on leanopengl.com tutorial series*/
 
 // mouse interaction 
 glm::vec3 mouseInteractionForce(0.0f);
@@ -36,8 +34,8 @@ glm::vec3 cameraRight = glm::cross(cameraFront, cameraUp);
 float last_mouse_x;
 float last_mouse_y;
 
-float yaw;
-float pitch;
+float yaw = 90.0f;
+float pitch = 0.0f;
 
 float lastX;
 float lastY;
@@ -82,26 +80,24 @@ int main()
 
    // -------- SHADER CUBE 
 
-    // 8 vertices representing the corners of the bounding box
     float cubeVertices[] = {
-        -0.5f, -0.5f, -0.5f, // Index 0: Front-Bottom-Left
-        0.5f, -0.5f, -0.5f, // Index 1: Front-Bottom-Right
-        0.5f,  0.5f, -0.5f, // Index 2: Front-Top-Right
-        -0.5f,  0.5f, -0.5f, // Index 3: Front-Top-Left
-        -0.5f, -0.5f,  0.5f, // Index 4: Back-Bottom-Left
-        0.5f, -0.5f,  0.5f, // Index 5: Back-Bottom-Right
-        0.5f,  0.5f,  0.5f, // Index 6: Back-Top-Right
-        -0.5f,  0.5f,  0.5f  // Index 7: Back-Top-Left
+        -0.5f, -0.5f, -0.5f,
+        0.5f, -0.5f, -0.5f, 
+        0.5f,  0.5f, -0.5f, 
+        -0.5f,  0.5f, -0.5f,
+        -0.5f, -0.5f,  0.5f,
+        0.5f, -0.5f,  0.5f, 
+        0.5f,  0.5f,  0.5f, 
+        -0.5f,  0.5f,  0.5f 
     };
 
-    // 36 indices linking the corners into triangles
     unsigned int cubeIndices[] = {
-        0, 1, 2,  2, 3, 0, // Front face
-        4, 5, 6,  6, 7, 4, // Back face
-        4, 0, 3,  3, 7, 4, // Left face
-        1, 5, 6,  6, 2, 1, // Right face
-        3, 2, 6,  6, 7, 3, // Top face
-        4, 5, 1,  1, 0, 4  // Bottom face
+        0, 1, 2,  2, 3, 0, 
+        4, 5, 6,  6, 7, 4, 
+        4, 0, 3,  3, 7, 4, 
+        1, 5, 6,  6, 2, 1, 
+        3, 2, 6,  6, 7, 3, 
+        4, 5, 1,  1, 0, 4  
     };
 
 
@@ -363,7 +359,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
             return;
     }
 
-
+    // TODO: camera if flipping the first time its moved 
     // camera logic:
     if (cameraOn)
     {
