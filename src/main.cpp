@@ -155,31 +155,6 @@ int main()
     // unbind it to safe-keep it until the main loop
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
     
-    // ------------------------------------------
-
-    // generate buffer objects for the sim vector feild
-    GLuint u_ssbo;
-    glGenBuffers(1, &u_ssbo);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, u_ssbo);
-
-    GLuint v_ssbo;
-    glGenBuffers(1, &v_ssbo);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, v_ssbo);
-
-   GLuint w_ssbo;
-    glGenBuffers(1, &w_ssbo);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, w_ssbo);
-
-    GLsizeiptr buffer_size = sim.get_width() * sim.get_depth() * sim.get_height() * sizeof(float);
-
-    glBufferData(GL_SHADER_STORAGE_BUFFER, buffer_size, sim.u_old, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, u_ssbo);
-
-    glBufferData(GL_SHADER_STORAGE_BUFFER, buffer_size, sim.v_old, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, v_ssbo);
-
-    glBufferData(GL_SHADER_STORAGE_BUFFER, buffer_size, sim.w_old, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, w_ssbo);
     
     //--------------------------------------------
     // build the fluid shader 
@@ -190,7 +165,8 @@ int main()
     glm::vec3 fluid_colors[2] = {
     glm::vec3(0.0f, 0.4f, 0.8f), // blue
     glm::vec3(0.9f, 0.1f, 0.1f)  // red
-        };
+    };
+
     // get memory location of fluid_colors uniform
     GLint colorsLoc = glGetUniformLocation(fluid_shader.ID, "fluid_colors");
     // send colors to gpy memory (with pointer)
@@ -295,20 +271,6 @@ int main()
         GLint camLoc = glGetUniformLocation(fluid_shader.ID, "camera_pos_local");
         glUniform3fv(camLoc, 1, glm::value_ptr(cameraPosLocal));
 
-        // pass velocity to gpu shaders ---------------------
-        // using buffer sub data instead of buffer data update 
-        // TODO: using buffer sub data causes stutering ? 
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, u_ssbo);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, buffer_size, sim.u, GL_DYNAMIC_DRAW);
-        //glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, buffer_size, sim.u);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, v_ssbo);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, buffer_size, sim.v, GL_DYNAMIC_DRAW);
-        //glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, buffer_size, sim.v);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, w_ssbo);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, buffer_size, sim.w, GL_DYNAMIC_DRAW);
-        //glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, buffer_size, sim.w);       
-         // unbined to clean it 
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         // ------------------------------------------------
         // pass densities data to gpu for the shader
         densitiesData = sim.get_densities();
@@ -317,6 +279,8 @@ int main()
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D_ARRAY, densityTextureArray);
 
+
+        
         glPixelStorei(GL_UNPACK_ALIGNMENT, 4); // set pixel store to 4bit aligned floats 
         glPixelStorei(GL_UNPACK_ROW_LENGTH, sim.get_width());  // width is N+2
         glPixelStorei(GL_UNPACK_IMAGE_HEIGHT, sim.get_height()); //hight is N+2

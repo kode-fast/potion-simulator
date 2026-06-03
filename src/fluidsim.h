@@ -18,7 +18,7 @@ const int GRID_SIZE = (N+2) * (N+2) * (N+2);
 // number of fluids that can be in the simulation 
 const int NUM_FLUIDS = 1;
 
-float gravity_constant = 800.0f; // without dt *,  10 ~ 20is good
+// float gravity_constant = 800.0f; // without dt *,  10 ~ 20is good
 
 // macro that converts coordents to the index in the 1d array 
 // loops need to go k j ifor cache optimization. our 1d array is in the order all i data then all j data then all k data 
@@ -82,8 +82,8 @@ public:
         }
         
         // define liqid properties 
-        fluidTypes[0] = {0.001f, -0.1f, glm::vec3(0.0f, 0.5f, 1.0f)}; // water
-        fluidTypes[1] = {0.050f, 0.2f, glm::vec3(0.8f, 0.7f, 0.2f)}; // oil
+        fluidTypes[0] = {0.001f, 80.0f, glm::vec3(0.0f, 0.5f, 1.0f)}; // blue
+        fluidTypes[1] = {0.050f, 80.0f, glm::vec3(0.8f, 0.2f, 0.2f)}; // red
 
     }
 
@@ -385,24 +385,25 @@ public:
             // add fluid:
             densities[0][idx] += 1.0f;
         }
-        
+    
         // i guess this is just the same as setting gravity to 4700
         float gravity = 4000.0f;   
         // bouency basicly just changes the gravety of indavidual cells 
         float buoyancy = 80.0f;  // bouency - gravity 
         float float_sink_coef = buoyancy + gravity;
+        for (int f = 0; f < NUM_FLUIDS; f++) {
 
-        // add grav to every cell
-        for (int cell_idx = 0; cell_idx < GRID_SIZE; cell_idx++) {
+            // add grav to every cell
+            for (int cell_idx = 0; cell_idx < GRID_SIZE; cell_idx++) {
 
-            // use IX to calculate coordentes to index 
-            float cell_density = densities[0][cell_idx];
-            
-            if (cell_density > 0.01f) {
-                v_old[cell_idx] -= float_sink_coef * cell_density * dt;
+                // use IX to calculate coordentes to index 
+                float cell_density = densities[f][cell_idx];
+                
+                if (cell_density > 0.01f) {
+                    v_old[cell_idx] -= float_sink_coef * cell_density * dt;
+                }
+
             }
-
-
         }
 
         // higher is thicker
@@ -418,16 +419,18 @@ public:
 
         // vel_step processes your newly added gravity force along with fluid dynamics
         vel_step(N, u, v, w, u_old, v_old, w_old, safe_viscosity, dt);
-        
-        // dens_step moves the fluid matter along that resulting downward flow
-        dens_step(N, densities[0], densities_old[0], u, v, w, safe_diffusion, dt);
 
-        // reset the source arrays . were using swapping so this is IMPORTANT
-        std::fill(u_old, u_old + GRID_SIZE, 0.0f);
-        std::fill(v_old, v_old + GRID_SIZE, 0.0f);
-        std::fill(w_old, w_old + GRID_SIZE, 0.0f);
-        std::fill(densities_old[0], densities_old[0] + GRID_SIZE, 0.0f);
+        for (int f = 0; f < NUM_FLUIDS; f++) {
 
+            // dens_step moves the fluid matter along that resulting downward flow
+            dens_step(N, densities[f], densities_old[f], u, v, w, safe_diffusion, dt);
+
+            // reset the source arrays . were using swapping so this is IMPORTANT
+            std::fill(u_old, u_old + GRID_SIZE, 0.0f);
+            std::fill(v_old, v_old + GRID_SIZE, 0.0f);
+            std::fill(w_old, w_old + GRID_SIZE, 0.0f);
+            std::fill(densities_old[f], densities_old[f] + GRID_SIZE, 0.0f);
+        }
 
     }
     
@@ -435,44 +438,44 @@ public:
     void fill() {
 
 
-    std::fill(u, u + GRID_SIZE, 0.0f);
-    std::fill(v, v + GRID_SIZE, 0.0f);
-    std::fill(w, w + GRID_SIZE, 0.0f);
-    std::fill(u_old, u_old + GRID_SIZE, 0.0f);
-    std::fill(v_old, v_old + GRID_SIZE, 0.0f);
-    std::fill(w_old, w_old + GRID_SIZE, 0.0f);
+        std::fill(u, u + GRID_SIZE, 0.0f);
+        std::fill(v, v + GRID_SIZE, 0.0f);
+        std::fill(w, w + GRID_SIZE, 0.0f);
+        std::fill(u_old, u_old + GRID_SIZE, 0.0f);
+        std::fill(v_old, v_old + GRID_SIZE, 0.0f);
+        std::fill(w_old, w_old + GRID_SIZE, 0.0f);
 
-    for (int f = 0; f < NUM_FLUIDS; f++) {
-        std::fill(densities[f], densities[f] + GRID_SIZE, 0.0f);
-        std::fill(densities_old[f], densities_old[f] + GRID_SIZE, 0.0f);
-    }
-    //sphere
-    float cx = 16.5f; 
-    float cy = 9.0f; 
-    float cz = 16.5f;
-    float radius = 8.0f;
+        
+        std::fill(densities[0], densities[0] + GRID_SIZE, 0.0f);
+        std::fill(densities_old[0], densities_old[0] + GRID_SIZE, 0.0f);
+        
+        //sphere
+        float cx = 16.5f; 
+        float cy = 9.0f; 
+        float cz = 16.5f;
+        float radius = 8.0f;
 
-    for (int i = 1; i <= N; i++) {
-        for (int j = 1; j <= N; j++) {
-            for (int k = 1; k <= N; k++) {
-                
-                float rx = (float)i - cx;
-                float ry = (float)j - cy;
-                float rz = (float)k - cz;
-                float distance = std::sqrt(rx*rx + ry*ry + rz*rz);
+        for (int i = 1; i <= N; i++) {
+            for (int j = 1; j <= N; j++) {
+                for (int k = 1; k <= N; k++) {
+                    
+                    float rx = (float)i - cx;
+                    float ry = (float)j - cy;
+                    float rz = (float)k - cz;
+                    float distance = std::sqrt(rx*rx + ry*ry + rz*rz);
 
-                if (distance <= radius) {
-                    densities[0][IX(i, j, k)] = 0.5f;
+                    if (distance <= radius) {
+                        densities[0][IX(i, j, k)] = 0.5f;
+                    }
                 }
             }
         }
+        // set the bounds here 
+        set_bnd(N, 1, u);
+        set_bnd(N, 2, v);
+        set_bnd(N, 3, w);
+        set_bnd(N, 0, densities[0]);
     }
-    // set the bounds here 
-    set_bnd(N, 1, u);
-    set_bnd(N, 2, v);
-    set_bnd(N, 3, w);
-    set_bnd(N, 0, densities[0]);
-}
     
 
     // add fluid at the selected cell

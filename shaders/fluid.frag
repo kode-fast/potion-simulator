@@ -13,21 +13,11 @@ uniform int num_fluids = 1;
 
 uniform vec3 camera_pos_local;
 uniform int max_steps = 256; // 128
-uniform float step_size = 0.01;
+uniform float step_size = 0.01; // 0.01
 
 // TODO: need to update this when doing multi colors 
-uniform vec3 fluid_colors[1];
+uniform vec3 fluid_colors;
 
-// 
-layout (std430, binding = 4) buffer u_ssbo { 
-    float u_data[]; 
-};
-layout (std430, binding = 5) buffer v_ssbo { 
-    float v_data[]; 
-};
-layout (std430, binding = 6) buffer w_ssbo { 
-    float w_data[]; 
-};
 
 void main(){
     vec3 current_pos = tex_coords;
@@ -44,8 +34,8 @@ void main(){
 
     float accumulated_density = 0.0;
     vec3 mixed_color = vec3(0.0);
-    float spec = 1.0;
-
+    float spec = 0.0;
+    float fresnel = 0.0;
     // ray marching loop
     for(int step = 0; step < max_steps; step++) {
         // stop if ray leaves the cube bounds 
@@ -77,49 +67,45 @@ void main(){
                 // ----------  
                 
                 // if its the fist colour on the line calculate the specular reflection from the vectors in that cell
-                if (accumulated_density < 0.1) {
-                    // convert the texture position to the cell grid of 34 x 34 
-                    // (becouse were using a texture for the density this is done automaticly for that, but not for this)
-                    // TODO: use a texture for this too then? 
-                    // u v w are FLATENED 
-                    int x = clamp(int(current_pos.x * float(grid_depth)),  0, grid_depth - 1);
-                    int y = clamp(int(current_pos.y * float(grid_depth)), 0, grid_depth - 1);
-                    int z = clamp(int(current_pos.z * float(grid_depth)),  0, grid_depth - 1);
-                    // convert to flattend idx 
-                    int IX = x + (y * grid_depth) + (z * grid_depth * grid_depth);
+                if (accumulated_density < 0.01) {
                     
-                    // make sure the vel vector is normalized so the cross works even with small vel values 
-                    
-                    vec3 vel_vec = vec3(u_data[IX], v_data[IX], w_data[IX]);
-                    
-                    // using fixed z vector to calculate normals from velocity vectors
-                    vec3 norm = cross(normalize(vel_vec),vec3(0.0,1.0,0.0));
-                    // make sure norm can be made from cross 
+                    // instead of using the vel sample the nabouring cells densities and get the normal from where the low / high densities are 
+                
+                    // cell distance in texture space
+                    float tex_cell_dist = 1.0 / float(grid_depth); 
+                    // sample the 
+                    // right and left cells 
+                    float x_right = texture(fluid_textures, vec3(current_pos.x + tex_cell_dist, current_pos.y, global_slice_index)).r;
+                    float x_left = texture(fluid_textures, vec3(current_pos.x - tex_cell_dist, current_pos.y, global_slice_index)).r;
+                    // up and down cells 
+                    float y_up = texture(fluid_textures, vec3(current_pos.x, current_pos.y + tex_cell_dist, global_slice_index)).r;
+                    float y_down = texture(fluid_textures, vec3(current_pos.x, current_pos.y - tex_cell_dist, global_slice_index)).r;
+                    // front and back cells // these need to be done diffrently // the problem was it was looking at the wrong index 
+                    float z_front = texture(fluid_textures, vec3(current_pos.xy, global_slice_index + 1.0)).r;
+                    float z_back  = texture(fluid_textures, vec3(current_pos.xy, global_slice_index - 1.0)).r;
 
-                    if ((length(norm) > 0.1)) {
-                        norm = normalize(norm);
-                        // the light vector need to be pointing to the PIXEL not just 0,0,0
-                        vec3 light_vec = normalize(current_pos - vec3(5.0,5.0,5.0));
-                        //vec3 light_vec = ray_dir;
+                    // the direction on the density (ie if x_right is denser the x_left then x value will be positive ect)
+                    vec3 density_gradient = vec3(x_right - x_left, y_up - y_down, z_front - z_back);
 
-                        //vec3 ref =  (2*dot(norm,light_vec)*norm) - light_vec;
-                        vec3 ref = reflect(light_vec, norm); // theres a built in reflect function in gsgl apareantly
-                        // cut out negitive values 
-                        spec = max(dot(ref, ray_dir), 0.0);
-                        spec = pow(spec, 16.0); // power it to ramp the value up 
+                    
+                    if (length(density_gradient) > 0.0001) {
+
+                        vec3 norm = normalize(-density_gradient);
+
+                        //vec3 light_vec = normalize(current_pos - vec3(0.0, 1.0, 0.0));
+                        vec3 light_vec = - ray_dir;
+                        vec3 half_vec = normalize(light_vec - ray_dir);
+
+                        fresnel = pow(max(0.0, 1.0 - dot(norm, - ray_dir)),4.0);
+                        spec = max(dot(half_vec,norm), 0.0);
+                        spec = pow(spec, 64.0); 
                     }
 
                 }
 
                 float sample_absorb = density * step_size * 500.0; // * 500 looks good
                 // add fluid color scaled by its density 
-
-                // add foam white color for low density 
-                if (density < 0.01){
-                    mixed_color += vec3(1.0,1.0,1.0) * sample_absorb * (1.0 - accumulated_density);
-                } else {
-                    mixed_color += fluid_colors[i] * sample_absorb * (1.0 - accumulated_density);
-                }
+                mixed_color += fluid_colors[i] * sample_absorb * (1.0 - accumulated_density); // vec3(0.0f, 0.4f, 0.8f)
                 accumulated_density += sample_absorb;
             } 
 
@@ -133,7 +119,6 @@ void main(){
 
         // advance ray
         current_pos += ray_dir * step_size;
-
     }
     // these need to be outside the for loop duh
     // if no density can discard this shader pixel
@@ -143,8 +128,12 @@ void main(){
 
     // scale white highlights from spec 
     vec3 spec_colour = vec3(1.0,1.0,1.0) * spec * 0.4 ;
+    // mix function mixes based on the frensel value 
+    vec3 sky_colour = vec3(0.4, 0.5, 0.7);
+    vec3 final_colour = mix(mixed_color, sky_colour, fresnel * 0.5) + spec_colour;
+
     // frag color is the mixed color RGB and density as A
-    FragColor = vec4(mixed_color + spec_colour , accumulated_density);
+    FragColor = vec4(final_colour, accumulated_density);
 
 
 }
