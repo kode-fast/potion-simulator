@@ -9,14 +9,14 @@ in vec3 tex_coords; // the coordenits of the pixel on the texture were rendering
 uniform sampler2DArray fluid_textures;
 // 32 + 2 for outer sim part 
 uniform int grid_depth = 32 + 2; // N+2 // dont render the buffer cells ?
-uniform int num_fluids = 1;
+uniform int num_fluids = 2;
 
 uniform vec3 camera_pos_local;
 uniform int max_steps = 256; // 128
 uniform float step_size = 0.01; // 0.01
 
 // TODO: need to update this when doing multi colors 
-uniform vec3 fluid_colors;
+uniform vec3 fluid_colors[2]; // this declares a vec3 array of 2 
 
 
 void main(){
@@ -44,8 +44,26 @@ void main(){
             current_pos.z < 0.0 || current_pos.z > 1.0) {
             break;
         }        
+    
+    // -- exclude the boundery cells from rendering cause they ugly 
+
+    float border_min = 1.0 / float(grid_depth); // taking out 1st cell                   
+    float border_max = float(grid_depth - 2) / float(grid_depth); // taking out last cell
+
+    // remap from 0.0 to 1.0 to ~0.1 to ~0.9
+    vec3 cropped_pos = mix(vec3(border_min), vec3(border_max), current_pos);
+
+    // use the cropped position to find the texture slice 
+    float local_z_slice = cropped_pos.z * float(grid_depth);
+    
+    for(int i = 0; i < num_fluids; i++) {
+        float global_slice_index = (float(i) * float(grid_depth)) + local_z_slice;
         
-        
+        // use the croped x and y
+        vec3 uvz_slice = vec3(cropped_pos.xy, global_slice_index);
+        float density = texture(fluid_textures, uvz_slice).r;
+
+        /*
         // this is where the ray is currently in the z value of the texture stack. ie this is the index of the texture we want if there was 1 texture in the stack
         float local_z_slice = current_pos.z * float(grid_depth);
         // for each fluid 
@@ -59,6 +77,8 @@ void main(){
             // the final value from the texture array at the uv, only gets red chanell as thats where were storing the values 
             float density = texture(fluid_textures, uvz_slice).r;
             
+        */
+
             // control what density gets rendered
             if (density > 0.01) {
                 // debug:

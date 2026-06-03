@@ -12,6 +12,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 // settings
 const unsigned int SCR_WIDTH = 1920;
@@ -20,7 +21,7 @@ const unsigned int SCR_HEIGHT = 1080;
 // mouse interaction 
 glm::vec3 mouseInteractionForce(0.0f);
 bool isInteract = false;
-
+int toggleFluid = 0;
 
 // mouse camera variables 
 bool cameraOn = false;
@@ -192,9 +193,8 @@ int main()
 
     const float radius = 10.0f;
 
-
+    glfwSetKeyCallback(window, key_callback);
     // capture curser and set callback functoin 
-    
     glfwSetCursorPosCallback(window, mouse_callback);
     // register mouse button callback too for mouse controlls
     glfwSetMouseButtonCallback(window, mouse_button_callback);
@@ -240,7 +240,7 @@ int main()
        // calculate mouse movement 
 
 
-        sim.step(delta_time, mouseInteractionForce, isInteract);
+        sim.step(delta_time, mouseInteractionForce, isInteract, toggleFluid);
 
         // ----------------------
         // debug print frame time 
@@ -279,12 +279,33 @@ int main()
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D_ARRAY, densityTextureArray);
 
-
         
         glPixelStorei(GL_UNPACK_ALIGNMENT, 4); // set pixel store to 4bit aligned floats 
         glPixelStorei(GL_UNPACK_ROW_LENGTH, sim.get_width());  // width is N+2
         glPixelStorei(GL_UNPACK_IMAGE_HEIGHT, sim.get_height()); //hight is N+2
 
+        // TODO: fix the old method of uploading 1 time but now with multipule fluids 
+        // -------------------------- 
+            // this uploads each z slice seperetly so that all the slices are uploaded correctly 
+        int sliceSize = sim.get_width() * sim.get_height();
+
+        for (int f = 0; f < sim.get_num_fluid(); ++f) {
+            for (int z = 0; z < sim.get_depth(); ++z) {
+
+                float* slicePtr = densitiesData[f] + (z * sliceSize);
+                
+                int targetLayer = (f * sim.get_depth()) + z;
+
+                glTexSubImage3D(
+                    GL_TEXTURE_2D_ARRAY, 0,
+                    0, 0, targetLayer, 
+                    sim.get_width(), sim.get_height(), 1, 
+                    GL_RED, GL_FLOAT, slicePtr
+                );
+            }
+        }
+        //--------------------------------
+        /*
         // pass the texture to the gpu for each texter on the gpu texter layer i 
         for (int i = 0; i < sim.get_num_fluid(); ++i) {
             // get pointer to 3d density data of fluid #i
@@ -297,13 +318,14 @@ int main()
                 0,                      
                 0, 0,                   //x,y offset
                 i,                      // i is the z layer offset 
-                sim.get_width(), sim.get_height(), sim.get_depth(), 
+                sim.get_width(), sim.get_height(), sim.get_depth()*2, 
                 GL_RED,                 
                 GL_FLOAT,               
                 flatVolumePtr           
             );
            
         }
+        */
         // reset pixel storing state back 
         glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
         glPixelStorei(GL_UNPACK_IMAGE_HEIGHT, 0);
@@ -441,14 +463,24 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
     }
 }
 
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+
+    if (key == GLFW_KEY_F && action == GLFW_PRESS) {
+        // TODO def better way to do this with logic
+        if (toggleFluid == 0) {
+            toggleFluid = 1;
+        }else{
+            toggleFluid = 0;
+        }
+    }
+}
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
-    if (glfwGetKey(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 }
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
 // ---------------------------------------------------------------------------------------------

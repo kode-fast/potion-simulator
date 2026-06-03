@@ -16,7 +16,7 @@ const int N = 32;
 const int GRID_SIZE = (N+2) * (N+2) * (N+2);
 
 // number of fluids that can be in the simulation 
-const int NUM_FLUIDS = 1;
+const int NUM_FLUIDS = 2;
 
 // float gravity_constant = 800.0f; // without dt *,  10 ~ 20is good
 
@@ -361,13 +361,17 @@ public:
         x[IX(N+1, N+1, N+1)] = 1.0f/3.0f * (x[IX(N, N+1, N+1)]+x[IX(N+1, N, N+1)]+x[IX(N+1, N+1, N)]);
     } 
     
-    void step(float dt, glm::vec3 mouse_interaction, bool is_interacting) {
+    void step(float dt, glm::vec3 mouse_interaction, bool is_interacting, int toggle_fluid) {
         // disapearing problem is that the fluid sim is for gas, and in the avging cells were going to 0 and 'evaperating'
         // the bounding cells were eating the liquid as there values are always 0 and they were avreging with the fluid making it go to 0
         // TODO: disapearing problem still exists 
             // mabey the relxation loops were just too small?
             // try to enforce the density? 
 
+        // reset the source arrays . were using swapping so this is IMPORTANT
+        std::fill(u_old, u_old + GRID_SIZE, 0.0f);
+        std::fill(v_old, v_old + GRID_SIZE, 0.0f);
+        std::fill(w_old, w_old + GRID_SIZE, 0.0f);
         // add mouse added velocities too : 
         // nozzle effect interaction:
         if (is_interacting) {
@@ -383,7 +387,7 @@ public:
             w[idx] += mouse_interaction.z * 1.0f;
 
             // add fluid:
-            densities[0][idx] += 1.0f;
+            densities[toggle_fluid][idx] += 1.0f;
         }
     
         // i guess this is just the same as setting gravity to 4700
@@ -421,15 +425,13 @@ public:
         vel_step(N, u, v, w, u_old, v_old, w_old, safe_viscosity, dt);
 
         for (int f = 0; f < NUM_FLUIDS; f++) {
+            // clear the fluid desnities before 
+            std::fill(densities_old[f], densities_old[f] + GRID_SIZE, 0.0f);
 
             // dens_step moves the fluid matter along that resulting downward flow
             dens_step(N, densities[f], densities_old[f], u, v, w, safe_diffusion, dt);
 
-            // reset the source arrays . were using swapping so this is IMPORTANT
-            std::fill(u_old, u_old + GRID_SIZE, 0.0f);
-            std::fill(v_old, v_old + GRID_SIZE, 0.0f);
-            std::fill(w_old, w_old + GRID_SIZE, 0.0f);
-            std::fill(densities_old[f], densities_old[f] + GRID_SIZE, 0.0f);
+
         }
 
     }
@@ -445,9 +447,11 @@ public:
         std::fill(v_old, v_old + GRID_SIZE, 0.0f);
         std::fill(w_old, w_old + GRID_SIZE, 0.0f);
 
-        
-        std::fill(densities[0], densities[0] + GRID_SIZE, 0.0f);
-        std::fill(densities_old[0], densities_old[0] + GRID_SIZE, 0.0f);
+        for (int i = 0; i < NUM_FLUIDS; i++){
+            std::fill(densities[i], densities[i] + GRID_SIZE, 0.0f);
+            std::fill(densities_old[i], densities_old[i] + GRID_SIZE, 0.0f);
+        }
+
         
         //sphere
         float cx = 16.5f; 
