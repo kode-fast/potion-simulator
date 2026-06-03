@@ -135,7 +135,7 @@ int main()
 
     float** densitiesData = sim.get_densities();
     // randomly fill to test 
-    sim.random_fill();
+    sim.fill();
     GLuint densityTextureArray;
 
     glGenTextures(1, &densityTextureArray);
@@ -154,8 +154,33 @@ int main()
 
     // unbind it to safe-keep it until the main loop
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+    
+    // ------------------------------------------
 
+    // generate buffer objects for the sim vector feild
+    GLuint u_ssbo;
+    glGenBuffers(1, &u_ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, u_ssbo);
 
+    GLuint v_ssbo;
+    glGenBuffers(1, &v_ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, v_ssbo);
+
+   GLuint w_ssbo;
+    glGenBuffers(1, &w_ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, w_ssbo);
+
+    GLsizeiptr buffer_size = sim.get_width() * sim.get_depth() * sim.get_height() * sizeof(float);
+
+    glBufferData(GL_SHADER_STORAGE_BUFFER, buffer_size, sim.u_old, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, u_ssbo);
+
+    glBufferData(GL_SHADER_STORAGE_BUFFER, buffer_size, sim.v_old, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, v_ssbo);
+
+    glBufferData(GL_SHADER_STORAGE_BUFFER, buffer_size, sim.w_old, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, w_ssbo);
+    
     //--------------------------------------------
     // build the fluid shader 
     Shader fluid_shader("shaders/camera.vert","shaders/fluid.frag");
@@ -187,8 +212,6 @@ int main()
     float last_frame_time = 0;
     float current_frame_time = 0;
     int nbFrames = 0;
-
-
 
 
     const float radius = 10.0f;
@@ -241,8 +264,6 @@ int main()
        // calculate mouse movement 
 
 
-
-
         sim.step(delta_time, mouseInteractionForce, isInteract);
 
         // ----------------------
@@ -274,6 +295,21 @@ int main()
         GLint camLoc = glGetUniformLocation(fluid_shader.ID, "camera_pos_local");
         glUniform3fv(camLoc, 1, glm::value_ptr(cameraPosLocal));
 
+        // pass velocity to gpu shaders ---------------------
+        // using buffer sub data instead of buffer data update 
+        // TODO: using buffer sub data causes stutering ? 
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, u_ssbo);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, buffer_size, sim.u, GL_DYNAMIC_DRAW);
+        //glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, buffer_size, sim.u);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, v_ssbo);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, buffer_size, sim.v, GL_DYNAMIC_DRAW);
+        //glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, buffer_size, sim.v);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, w_ssbo);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, buffer_size, sim.w, GL_DYNAMIC_DRAW);
+        //glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, buffer_size, sim.w);       
+         // unbined to clean it 
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+        // ------------------------------------------------
         // pass densities data to gpu for the shader
         densitiesData = sim.get_densities();
 
@@ -284,6 +320,7 @@ int main()
         glPixelStorei(GL_UNPACK_ALIGNMENT, 4); // set pixel store to 4bit aligned floats 
         glPixelStorei(GL_UNPACK_ROW_LENGTH, sim.get_width());  // width is N+2
         glPixelStorei(GL_UNPACK_IMAGE_HEIGHT, sim.get_height()); //hight is N+2
+
         // pass the texture to the gpu for each texter on the gpu texter layer i 
         for (int i = 0; i < sim.get_num_fluid(); ++i) {
             // get pointer to 3d density data of fluid #i

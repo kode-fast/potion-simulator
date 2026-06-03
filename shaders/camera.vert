@@ -1,8 +1,11 @@
-#version 400 core
+#version 430 core
 layout (location = 0) in vec3 aPos;
+
 
 // need the tex_coords as an out var and calculate object space to texture space   
 out vec3 tex_coords;
+
+
 
 uniform mat4 model;
 uniform mat4 view;

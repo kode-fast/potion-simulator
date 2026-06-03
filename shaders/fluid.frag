@@ -1,4 +1,4 @@
-#version 400 core 
+#version 430 core 
 
 out vec4 FragColor;
 
@@ -8,14 +8,26 @@ in vec3 tex_coords; // the coordenits of the pixel on the texture were rendering
 // this is where the shader accesses the textures we passed into the gpu
 uniform sampler2DArray fluid_textures;
 // 32 + 2 for outer sim part 
-uniform int grid_depth = 32 + 2; // N+2
+uniform int grid_depth = 32 + 2; // N+2 // dont render the buffer cells ?
 uniform int num_fluids = 1;
 
 uniform vec3 camera_pos_local;
 uniform int max_steps = 256; // 128
 uniform float step_size = 0.01;
 
+// TODO: need to update this when doing multi colors 
 uniform vec3 fluid_colors[1];
+
+// 
+layout (std430, binding = 4) buffer u_ssbo { 
+    float u_data[]; 
+};
+layout (std430, binding = 5) buffer v_ssbo { 
+    float v_data[]; 
+};
+layout (std430, binding = 6) buffer w_ssbo { 
+    float w_data[]; 
+};
 
 void main(){
     vec3 current_pos = tex_coords;
@@ -32,6 +44,7 @@ void main(){
 
     float accumulated_density = 0.0;
     vec3 mixed_color = vec3(0.0);
+    float spec = 1.0;
 
     // ray marching loop
     for(int step = 0; step < max_steps; step++) {
@@ -56,20 +69,63 @@ void main(){
             // the final value from the texture array at the uv, only gets red chanell as thats where were storing the values 
             float density = texture(fluid_textures, uvz_slice).r;
             
+            // control what density gets rendered
             if (density > 0.01) {
                 // debug:
                 //FragColor = vec4(1.0, 0.0, 1.0, 1.0); 
                 //return;
-                // ----------
+                // ----------  
+                
+                // if its the fist colour on the line calculate the specular reflection from the vectors in that cell
+                if (accumulated_density < 0.1) {
+                    // convert the texture position to the cell grid of 34 x 34 
+                    // (becouse were using a texture for the density this is done automaticly for that, but not for this)
+                    // TODO: use a texture for this too then? 
+                    // u v w are FLATENED 
+                    int x = clamp(int(current_pos.x * float(grid_depth)),  0, grid_depth - 1);
+                    int y = clamp(int(current_pos.y * float(grid_depth)), 0, grid_depth - 1);
+                    int z = clamp(int(current_pos.z * float(grid_depth)),  0, grid_depth - 1);
+                    // convert to flattend idx 
+                    int IX = x + (y * grid_depth) + (z * grid_depth * grid_depth);
+                    
+                    // make sure the vel vector is normalized so the cross works even with small vel values 
+                    
+                    vec3 vel_vec = vec3(u_data[IX], v_data[IX], w_data[IX]);
+                    
+                    // using fixed z vector to calculate normals from velocity vectors
+                    vec3 norm = cross(normalize(vel_vec),vec3(0.0,1.0,0.0));
+                    // make sure norm can be made from cross 
+
+                    if ((length(norm) > 0.1)) {
+                        norm = normalize(norm);
+                        // the light vector need to be pointing to the PIXEL not just 0,0,0
+                        vec3 light_vec = normalize(current_pos - vec3(5.0,5.0,5.0));
+                        //vec3 light_vec = ray_dir;
+
+                        //vec3 ref =  (2*dot(norm,light_vec)*norm) - light_vec;
+                        vec3 ref = reflect(light_vec, norm); // theres a built in reflect function in gsgl apareantly
+                        // cut out negitive values 
+                        spec = max(dot(ref, ray_dir), 0.0);
+                        spec = pow(spec, 16.0); // power it to ramp the value up 
+                    }
+
+                }
+
                 float sample_absorb = density * step_size * 500.0; // * 500 looks good
                 // add fluid color scaled by its density 
-                mixed_color += fluid_colors[i] * sample_absorb * (1.0 - accumulated_density);
+
+                // add foam white color for low density 
+                if (density < 0.01){
+                    mixed_color += vec3(1.0,1.0,1.0) * sample_absorb * (1.0 - accumulated_density);
+                } else {
+                    mixed_color += fluid_colors[i] * sample_absorb * (1.0 - accumulated_density);
+                }
                 accumulated_density += sample_absorb;
             } 
 
 
         }
-        // if density is 1 then we can see through it anymore and can exit early
+        // if density is 1 then we cant see through it anymore and can exit early
         if(accumulated_density >= 0.9999) {
             accumulated_density = 1.0;
             break;
@@ -80,12 +136,15 @@ void main(){
 
     }
     // these need to be outside the for loop duh
-        // if no density can discard this shader pixel
-        if(accumulated_density <= 0.01){
-            discard;
-        }
-        
-        // frag color is the mixed color RGB and density as A
-        FragColor = vec4(mixed_color, accumulated_density);
+    // if no density can discard this shader pixel
+    if(accumulated_density <= 0.01){
+        discard;
+    }
+
+    // scale white highlights from spec 
+    vec3 spec_colour = vec3(1.0,1.0,1.0) * spec * 0.4 ;
+    // frag color is the mixed color RGB and density as A
+    FragColor = vec4(mixed_color + spec_colour , accumulated_density);
+
 
 }

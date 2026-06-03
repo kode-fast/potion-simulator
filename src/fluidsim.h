@@ -45,9 +45,9 @@ struct FluidProperties {
 class FluidSim{
 public:
 
-    float* u;
-    float* v;
-    float* w;
+    float* u; // x
+    float* v; // y
+    float* w; // z
 
     float* u_old;
     float* v_old;
@@ -385,6 +385,12 @@ public:
             // add fluid:
             densities[0][idx] += 1.0f;
         }
+        
+        // i guess this is just the same as setting gravity to 4700
+        float gravity = 4000.0f;   
+        // bouency basicly just changes the gravety of indavidual cells 
+        float buoyancy = 80.0f;  // bouency - gravity 
+        float float_sink_coef = buoyancy + gravity;
 
         // add grav to every cell
         for (int cell_idx = 0; cell_idx < GRID_SIZE; cell_idx++) {
@@ -392,10 +398,8 @@ public:
             // use IX to calculate coordentes to index 
             float cell_density = densities[0][cell_idx];
             
-
-
             if (cell_density > 0.01f) {
-                v_old[cell_idx] -= cell_density * gravity_constant * dt;
+                v_old[cell_idx] -= float_sink_coef * cell_density * dt;
             }
 
 
@@ -407,10 +411,10 @@ public:
         //float safe_diffusion = 0.0000001f;
 
         // higher is thicker
-        float safe_viscosity = 0.000000001f; 
+        float safe_viscosity = 0.0001f; 
         // higher is gas
         // TODO: any diffusion number seams to make the fluid disapear eventualy
-        float safe_diffusion = 0.00001f;
+        float safe_diffusion = 0.0f;
 
         // vel_step processes your newly added gravity force along with fluid dynamics
         vel_step(N, u, v, w, u_old, v_old, w_old, safe_viscosity, dt);
@@ -428,7 +432,7 @@ public:
     }
     
     // testing the renderer 
-    void random_fill() {
+    void fill() {
 
 
     std::fill(u, u + GRID_SIZE, 0.0f);
@@ -444,7 +448,7 @@ public:
     }
     //sphere
     float cx = 16.5f; 
-    float cy = 22.0f; 
+    float cy = 9.0f; 
     float cz = 16.5f;
     float radius = 8.0f;
 
