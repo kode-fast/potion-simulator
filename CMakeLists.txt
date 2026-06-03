@@ -15,6 +15,21 @@ add_executable(AlchemySim
     src/shader.h
 )
 
+# force static linking of compiler libraries for MinGW on Windows
+if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_link_options(AlchemySim PRIVATE "-static-libgcc" "-static-libstdc++" "-static")
+endif()
+
+# ------ handel shader assets 
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" 
+     DESTINATION "${CMAKE_CURRENT_BINARY_DIR}"
+)
+
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/shaders/"
+        DESTINATION bin/shaders
+)
+#-----------------
+
 # add math optimization options 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
     target_compile_options(AlchemySim PRIVATE -mavx2 -ffast-math)
@@ -36,3 +51,27 @@ configure_file(
     ${CMAKE_CURRENT_BINARY_DIR}/glfw3.dll 
     COPYONLY
 )
+
+#-----------------------------
+# make install exe package 
+#----------------------------
+
+# install your main executable target
+install(TARGETS AlchemySim
+    RUNTIME DESTINATION bin
+)
+
+# set installer metadata
+set(CPACK_PACKAGE_NAME "MyFluidSim")
+set(CPACK_PACKAGE_VENDOR "TheoryOfMajic")
+set(CPACK_PACKAGE_VERSION "1.0.0")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "fluid Sim")
+
+# define target generators (NSIS creates a standard Windows .exe setup wizard)
+set(CPACK_GENERATOR "NSIS;ZIP")
+
+# include the CPack module (this must be at the very end)
+include(CPack)
+
+
+
