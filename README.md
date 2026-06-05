@@ -1,1 +1,1 @@
-![sim example](./example.gif)
+<img src="./example.gif" width="100%" />
