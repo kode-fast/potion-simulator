@@ -391,7 +391,7 @@ public:
         }
     
         // i guess this is just the same as setting gravity to 4700
-        float gravity = 4000.0f;   
+        float gravity = 3000.0f;   // 4000 is good 
         // bouency basicly just changes the gravety of indavidual cells 
         float buoyancy = 80.0f;  // bouency - gravity 
         float float_sink_coef = buoyancy + gravity;

@@ -461,6 +461,14 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
             firstMouse = true; 
         }
     }
+    if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_PRESS) {
+        // TODO def better way to do this with logic
+        if (toggleFluid == 0) {
+            toggleFluid = 1;
+        }else{
+            toggleFluid = 0;
+        }
+    }
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
